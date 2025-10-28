@@ -177,3 +177,4 @@ It could be improved by :
 - Add unit test with mocks of OSV APIs, to make sure the code is working as expected. For example we can create a new CVE issue "any code with a function named test is vulnerable" and test that the agent is able to identify that in a codebase with a function named test.
 - Parse the LLM Output to have a structured JSON response instead of plain text, and be able to "tag" the CVE as risky or not based on the analysis.
 - Remove the absolute path in the document library files names, to avoid potential leaking sensitive information. But in the other hand, having the full path may help the agent to better understand the project structure and have more context.
+- Better file architecture and separation of concerns for production use.
