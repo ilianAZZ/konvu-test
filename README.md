@@ -3,7 +3,7 @@
 ## Steps
 
 1. Run `pip install -r requirements.txt` to install dependencies.
-2. Set your constants in `env.py`. (actual env file contains a ready-to-use agent with few files in context)
+2. Set your constants in `./src/env.py`. (actual env file contains a ready-to-use agent with few files in context)
 3. Run `cd ./src && python main.py <osv_vuln_id> <project_path>` to execute the CVE explanation process.
 
 ## Description
@@ -12,10 +12,10 @@ This project is composed in two main parts:
 
 1. **Agent initialization**: The agent is initialized with a document library containing code files from a specified codebase. The agent is created once and can be reused for multiple CVE analyses. ATM the agent name is in a constant in env.py. But it can be easily modified to be dynamic and handle multiple projects.
 
-   - 1 Create a library (Mistral API)
-   - 2 Parse git project to extract code files (using the git project, following the .gitignore rules)
-   - 3 Add code files to the library using (Mistral API)
-   - 4 Create an agent with the library in context (Mistral API)
+   - 1. Create a library (Mistral API)
+   - 2. Parse git project to extract code files (using the git project, following the .gitignore rules)
+   - 3. Upload files content & names to the library using (Mistral API)
+   - 4. Create an agent with the library in context (Mistral API)
 
 2. **CVE explanation**: For each CVE, the script fetches CVE data (OSV dev API), generate a prompt and uses Mistral API to get an explanation of how the CVE affects the codebase, by prompting the agent created in step 1.
 
@@ -25,15 +25,15 @@ The API/web server can be started running :
 python api.py
 ```
 
-But this file was fully AI generated only for fun. It seems to be working but was not fully tested.
+But this feature (html & flask server) was fully AI generated only for fun. It seems to be working but was not fully tested.
 
 ## Limitations
 
-The Mistral AI freetier is limited to 10 files in the document library. So the output will be very very limited. To fully test the agent capabilities, a paid plan is required or use another LLM provider that supports agents with document libraries.
+The Mistral AI freetier is limited to 10 files in the document library. So the output will be very very limited. To fully test the agent capabilities, different options are listed in the conclusion.
 
 ## Proof of concept
 
-The code was testes on a codebase with a monorepo structure. Due to the limit of 10 files, only few config files were added (.dockerignore, prettier)
+The code was tested on a large codebase with a monorepo structure. Due to the limit of 10 files, only few config files were added (.dockerignore, prettier, docker deploy files, gitignore, etc.)
 
 Using Mistral API, we can retreive the list of files in the document library.
 
@@ -64,7 +64,7 @@ Using Mistral API, we can retreive the list of files in the document library.
    ────────────────────────────────────────────────────────────
 ```
 
-When prompting the agent all files, we successfully got a summary of toese 10 files :
+When prompting the agent to list all files, we successfully got a summary of those files :
 
 ```text
 Generated Prompt:
@@ -83,7 +83,7 @@ Based on the search results, here is a list of files found in the document libra
 These files are typically used to manage and configure different aspects of a software development project, ensuring that unnecessary files are ignored by various tools and processes.
 ```
 
-We can try to ask the agent to list all files ignored by git, to make sure the content is properly ingested.
+We can try to ask the agent to list all files ignored by git, to make sure the content of files is properly ingested, and not only the file names.
 
 ```text
 Generated Prompt:
@@ -154,7 +154,10 @@ The confidence level is low due to the lack of explicit information regarding th
 The risk to the project is uncertain due to insufficient evidence regarding the use of runc. Further investigation is required to determine if the project is at risk.
 ```
 
-This shows that the agent is able to provide a structured analysis of the CVE based on the limited context it has.
+This shows that the agent is able to provide a structured analysis of the CVE based on the limited context it has. The agent output (uncertain, low confidence) is appropriate given the lack of specific information about runc in the codebase.
+
+In a real scenario, having more files in context (like package.json, docker-compose.yml, deployment scripts, etc.) would help the agent to provide a more accurate analysis.
+
 
 ## Conclusion
 
@@ -164,12 +167,13 @@ It could be improved by :
 
 - Preprocess the codebase to create a context of the project (dependencies, main features, architecture, OS runtime, frameworks used, etc.) to provide more meaningful context to the agent.
 - Remove the 10 file limit :
-  - Use another LLMprovider,
+  - Use another agent provider,
   - Pay for a higher tier on Mistral,
   - Try to implement this solution without library, just by providing files as tools (not tested yet, may be limited as well).
 - Improve the prompt engineering for better results.
 - Handle multiple projects/agents (for example, by using a hash of the codebase path as agent name).
 - For a normal project, the .env file should be excluded from git and not shared publicly, and not as a python file with constants.
 - Add proper error handling and logging for production use and debugging. Also to be able to have statistics on failures/success rate.
-- Add unit test with mocks of OSV APIs, to make sure the code is working as expected.
+- Add unit test with mocks of OSV APIs, to make sure the code is working as expected. For example we can create a new CVE issue "any code with a function named test is vulnerable" and test that the agent is able to identify that in a codebase with a function named test.
 - Parse the LLM Output to have a structured JSON response instead of plain text, and be able to "tag" the CVE as risky or not based on the analysis.
+- Remove the absolute path in the document library files names, to avoid potential leaking sensitive information. But in the other hand, having the full path may help the agent to better understand the project structure and have more context.
