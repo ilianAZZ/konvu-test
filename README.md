@@ -4,7 +4,7 @@
 
 1. Run `pip install -r requirements.txt` to install dependencies.
 2. Set your constants in `env.py`. (actual env file contains a ready-to-use agent with few files in context)
-3. Run `python main.py` to execute the CVE explanation process.
+3. Run `cd ./src && python main.py <osv_vuln_id> <project_path>` to execute the CVE explanation process.
 
 ## Description
 
@@ -169,3 +169,7 @@ It could be improved by :
   - Try to implement this solution without library, just by providing files as tools (not tested yet, may be limited as well).
 - Improve the prompt engineering for better results.
 - Handle multiple projects/agents (for example, by using a hash of the codebase path as agent name).
+- For a normal project, the .env file should be excluded from git and not shared publicly, and not as a python file with constants.
+- Add proper error handling and logging for production use and debugging. Also to be able to have statistics on failures/success rate.
+- Add unit test with mocks of OSV APIs, to make sure the code is working as expected.
+- Parse the LLM Output to have a structured JSON response instead of plain text, and be able to "tag" the CVE as risky or not based on the analysis.
