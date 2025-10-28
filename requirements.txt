@@ -1,0 +1,5 @@
+mistralai==1.9.11
+flask==3.1.2
+flask_cors==6.0.1
+markdown==3.9
+gitdb==4.0.12

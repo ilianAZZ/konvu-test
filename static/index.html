@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CVE Explainer | Understand Vulnerability Impact</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const API_BASE = '';
+
+        function CVEExplainer() {
+            // Form state
+            const [cveId, setCveId] = useState('');
+            const [devOs, setDevOs] = useState('');
+            const [serverOs, setServerOs] = useState('');
+            const [deployment, setDeployment] = useState('');
+            const [frameworks, setFrameworks] = useState('');
+            const [customInfo, setCustomInfo] = useState('');
+
+            // UI state
+            const [view, setView] = useState('welcome'); // 'welcome', 'loading', 'error', 'results'
+            const [errorMessage, setErrorMessage] = useState('');
+            const [apiConfigured, setApiConfigured] = useState(true);
+
+            // Results state
+            const [results, setResults] = useState(null);
+            const [currentMarkdown, setCurrentMarkdown] = useState('');
+            const [copySuccess, setCopySuccess] = useState(false);
+
+            // Health check on mount
+            useEffect(() => {
+                checkHealth();
+            }, []);
+
+            async function checkHealth() {
+                try {
+                    const response = await fetch(`${API_BASE}/api/health`);
+                    const data = await response.json();
+                    
+                    if (!data.mistral_api_configured) {
+                        console.warn('⚠️ Mistral API not configured - will use fallback mode');
+                        setApiConfigured(false);
+                    }
+                } catch (error) {
+                    console.error('Health check failed:', error);
+                }
+            }
+
+            async function analyzeCVE() {
+                const trimmedCveId = cveId.trim();
+                
+                // Validation
+                if (!trimmedCveId) {
+                    setErrorMessage('Please enter a CVE identifier');
+                    setView('error');
+                    return;
+                }
+                
+                // Prepare request data
+                const requestData = {
+                    cve_id: trimmedCveId.toUpperCase(),
+                    context: {
+                        dev_os: devOs.trim(),
+                        server_os: serverOs.trim(),
+                        deployment: deployment.trim(),
+                        frameworks: frameworks.trim(),
+                        custom_info: customInfo.trim()
+                    },
+                    codebase_path: '.'
+                };
+                
+                setView('loading');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/analyze`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Analysis failed');
+                    }
+                    
+                    setResults(data);
+                    setCurrentMarkdown(data.markdown);
+                    setView('results');
+                    
+                    // Scroll to top
+                    setTimeout(() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }, 100);
+                    
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    setErrorMessage(error.message || 'An error occurred during analysis. Please try again.');
+                    setView('error');
+                }
+            }
+
+            function handleKeyPress(e) {
+                if (e.key === 'Enter') {
+                    analyzeCVE();
+                }
+            }
+
+            function copyMarkdown() {
+                if (!currentMarkdown) return;
+                
+                navigator.clipboard.writeText(currentMarkdown)
+                    .then(() => {
+                        setCopySuccess(true);
+                        setTimeout(() => setCopySuccess(false), 2000);
+                    })
+                    .catch(err => {
+                        console.error('Copy failed:', err);
+                        alert('Failed to copy to clipboard');
+                    });
+            }
+
+            function resetForm() {
+                setCveId('');
+                setDevOs('');
+                setServerOs('');
+                setDeployment('');
+                setFrameworks('');
+                setCustomInfo('');
+                setResults(null);
+                setCurrentMarkdown('');
+                setView('welcome');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            function fillExample(exampleCve) {
+                setCveId(exampleCve);
+                document.getElementById('cve-id-input')?.focus();
+                document.getElementById('cve-id-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            const getSeverityColor = (severity) => {
+                const severityLower = severity?.toLowerCase();
+                if (severityLower === 'critical') return 'bg-red-600';
+                if (severityLower === 'high') return 'bg-orange-500';
+                if (severityLower === 'medium') return 'bg-yellow-500';
+                if (severityLower === 'low') return 'bg-blue-500';
+                return 'bg-gray-500';
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+                    <div className="container mx-auto px-4 py-8 max-w-7xl">
+                        {/* Header */}
+                        <header className="text-center mb-12">
+                            <h1 className="text-5xl font-bold text-gray-800 mb-3">
+                                🔒 CVE Explainer
+                            </h1>
+                            <p className="text-xl text-gray-600">
+                                Understand how CVEs impact your specific environment
+                            </p>
+                        </header>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Input Section */}
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-2xl shadow-lg p-8">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-6">📋 CVE Information</h2>
+                                    
+                                    <div className="mb-6">
+                                        <label htmlFor="cve-id-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                            CVE Identifier *
+                                        </label>
+                                        <input
+                                            id="cve-id-input"
+                                            type="text"
+                                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                            placeholder="CVE-2024-1234"
+                                            value={cveId}
+                                            onChange={(e) => setCveId(e.target.value)}
+                                            onKeyPress={handleKeyPress}
+                                            autoComplete="off"
+                                        />
+                                        <small className="text-gray-500 text-sm mt-1 block">
+                                            Example: CVE-2021-44228 (Log4Shell)
+                                        </small>
+                                    </div>
+
+                                    <h3 className="text-xl font-bold text-gray-800 mb-3 mt-8">🔧 Environment Context</h3>
+                                    <p className="text-sm text-gray-600 mb-4">
+                                        Provide information about your environment to get more relevant analysis
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label htmlFor="dev-os-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Development OS
+                                            </label>
+                                            <input
+                                                id="dev-os-input"
+                                                type="text"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., macOS 14, Ubuntu 22.04, Windows 11"
+                                                value={devOs}
+                                                onChange={(e) => setDevOs(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="server-os-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Production Server OS
+                                            </label>
+                                            <input
+                                                id="server-os-input"
+                                                type="text"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., Ubuntu 22.04 LTS, Amazon Linux 2023"
+                                                value={serverOs}
+                                                onChange={(e) => setServerOs(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="deployment-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Deployment Method
+                                            </label>
+                                            <input
+                                                id="deployment-input"
+                                                type="text"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., Docker, Kubernetes, AWS ECS, bare metal"
+                                                value={deployment}
+                                                onChange={(e) => setDeployment(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="frameworks-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Frameworks & Tech Stack
+                                            </label>
+                                            <input
+                                                id="frameworks-input"
+                                                type="text"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., Flask, React, PostgreSQL, Redis, Nginx"
+                                                value={frameworks}
+                                                onChange={(e) => setFrameworks(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="custom-info-input" className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Additional Context
+                                            </label>
+                                            <textarea
+                                                id="custom-info-input"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                rows="4"
+                                                placeholder="Any additional information that might be relevant:&#10;- Security measures already in place&#10;- Specific concerns&#10;- Compliance requirements&#10;- etc."
+                                                value={customInfo}
+                                                onChange={(e) => setCustomInfo(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={analyzeCVE}
+                                        disabled={view === 'loading'}
+                                        className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg hover:shadow-xl"
+                                    >
+                                        🔍 Analyze CVE Impact
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Output Section */}
+                            <div>
+                                {/* Loading State */}
+                                {view === 'loading' && (
+                                    <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+                                        <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-6"></div>
+                                        <p className="text-lg text-gray-700">Analyzing CVE and scanning codebase...</p>
+                                    </div>
+                                )}
+
+                                {/* Error State */}
+                                {view === 'error' && (
+                                    <div className="bg-red-50 border-2 border-red-300 rounded-2xl shadow-lg p-8">
+                                        <p className="text-red-700 text-lg">❌ {errorMessage}</p>
+                                    </div>
+                                )}
+
+                                {/* Results State */}
+                                {view === 'results' && results && (
+                                    <div className="bg-white rounded-2xl shadow-lg p-8">
+                                        <div className="flex items-start justify-between mb-6">
+                                            <h2 className="text-3xl font-bold text-gray-800">{results.cve_id}</h2>
+                                            <span className={`${getSeverityColor(results.severity)} text-white px-4 py-2 rounded-full text-sm font-bold uppercase`}>
+                                                {results.severity}
+                                            </span>
+                                        </div>
+
+                                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                                            <p className="text-gray-700">{results.summary}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-4 mb-6">
+                                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                                <p className="text-sm text-gray-600 mb-1">Affected Dependencies</p>
+                                                <p className={`text-3xl font-bold ${results.affected_dependencies > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {results.affected_dependencies}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                                <p className="text-sm text-gray-600 mb-1">Total Dependencies</p>
+                                                <p className="text-3xl font-bold text-gray-800">{results.total_dependencies}</p>
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                                <p className="text-sm text-gray-600 mb-1">Files Scanned</p>
+                                                <p className="text-3xl font-bold text-gray-800">{results.files_scanned}</p>
+                                            </div>
+                                        </div>
+
+                                        <hr className="my-6 border-gray-300" />
+
+                                        <div 
+                                            className="prose max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: results.html }}
+                                        />
+
+                                        <div className="flex gap-4 mt-8">
+                                            <button
+                                                onClick={copyMarkdown}
+                                                className={`flex-1 ${copySuccess ? 'bg-green-600' : 'bg-gray-600'} hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all`}
+                                            >
+                                                {copySuccess ? '✅ Copied!' : '📋 Copy as Markdown'}
+                                            </button>
+                                            <button
+                                                onClick={resetForm}
+                                                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all"
+                                            >
+                                                🔄 New Analysis
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Welcome State */}
+                                {view === 'welcome' && (
+                                    <div className="bg-white rounded-2xl shadow-lg p-8">
+                                        <div className="text-center mb-8">
+                                            <h2 className="text-3xl font-bold text-gray-800 mb-4">👋 Welcome to CVE Explainer</h2>
+                                            <p className="text-gray-600">Enter a CVE identifier and your environment details to get started.</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                            <div className="text-center p-4">
+                                                <span className="text-5xl mb-3 block">🔍</span>
+                                                <h3 className="text-lg font-bold text-gray-800 mb-2">Deep Analysis</h3>
+                                                <p className="text-sm text-gray-600">Scans your dependencies and code usage patterns</p>
+                                            </div>
+                                            <div className="text-center p-4">
+                                                <span className="text-5xl mb-3 block">🤖</span>
+                                                <h3 className="text-lg font-bold text-gray-800 mb-2">AI-Powered</h3>
+                                                <p className="text-sm text-gray-600">Clear explanations tailored to your environment</p>
+                                            </div>
+                                            <div className="text-center p-4">
+                                                <span className="text-5xl mb-3 block">⚡</span>
+                                                <h3 className="text-lg font-bold text-gray-800 mb-2">Actionable</h3>
+                                                <p className="text-sm text-gray-600">Get specific recommendations for your setup</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-indigo-50 rounded-lg p-6">
+                                            <h4 className="text-lg font-bold text-gray-800 mb-4">💡 Try these examples:</h4>
+                                            <ul className="space-y-2">
+                                                <li>
+                                                    <code 
+                                                        onClick={() => fillExample('CVE-2021-44228')}
+                                                        className="bg-white px-3 py-2 rounded border border-indigo-300 cursor-pointer hover:bg-indigo-100 transition-all inline-block"
+                                                    >
+                                                        CVE-2021-44228
+                                                    </code>
+                                                    <span className="text-gray-600 ml-2">- Log4Shell (famous RCE)</span>
+                                                </li>
+                                                <li>
+                                                    <code 
+                                                        onClick={() => fillExample('CVE-2024-27351')}
+                                                        className="bg-white px-3 py-2 rounded border border-indigo-300 cursor-pointer hover:bg-indigo-100 transition-all inline-block"
+                                                    >
+                                                        CVE-2024-27351
+                                                    </code>
+                                                    <span className="text-gray-600 ml-2">- Django SQL injection</span>
+                                                </li>
+                                                <li>
+                                                    <code 
+                                                        onClick={() => fillExample('CVE-2023-32681')}
+                                                        className="bg-white px-3 py-2 rounded border border-indigo-300 cursor-pointer hover:bg-indigo-100 transition-all inline-block"
+                                                    >
+                                                        CVE-2023-32681
+                                                    </code>
+                                                    <span className="text-gray-600 ml-2">- Requests vulnerability</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <footer className="text-center mt-12 text-gray-600">
+                            <p>
+                                Ilian A - <a href="https://ilianazz.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ilianazz.com</a>
+                            </p>
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CVEExplainer />);
+    </script>
+</body>
+</html>

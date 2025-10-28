@@ -168,3 +168,4 @@ It could be improved by :
   - Pay for a higher tier on Mistral,
   - Try to implement this solution without library, just by providing files as tools (not tested yet, may be limited as well).
 - Improve the prompt engineering for better results.
+- Handle multiple projects/agents (for example, by using a hash of the codebase path as agent name).
